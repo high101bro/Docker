@@ -57,7 +57,7 @@ echo -e "\n${yellow}============================================================
 for image in "${images[@]}"; do
     # Parses hardening_manifest.yaml and download packages to the image's docker directory
     echo -e "\n${red}[!]${green} Checking hardening_manifest for packages${reset}"
-    hardening_manifest=$(cat ./$image/hardening_manifest.yaml | grep 'url:' | cut -f 4 -d ' ')
+    hardening_manifest=$(cat ./$image/hardening_manifest.yaml | grep ' url:' | cut -f 4 -d ' ')
     while IFS= read -r PackageURL; do 
         PackageName=$(echo "$PackageURL" | rev | cut -f -1 -d '/' | rev)
         if [[ $(ls ./$image/$PackageName) ]]; then 
@@ -70,7 +70,7 @@ for image in "${images[@]}"; do
             echo -e "    - Downloading package...  ${yellow}$PackageURL${reset}"
             curl --location --url $PackageURL --output ./$image/$PackageName
         fi 2> /dev/null
-    done <<< ./$image/$hardening_manifest
+    done <<< $hardening_manifest
 
 
     # Removes any existing test builds; helps keep docker image listing clean
