@@ -109,7 +109,7 @@ echo -e "\n${yellow}============================================================
 
 # Test commands against image
 for image in "${images[@]}"; do
-    # Removes existing error file
+    # Removes existing report files
     rm -f ./$ReportDir/stderr_$image.txt
     rm -f ./$ReportDir/stderr_$image.txt
 
