@@ -2,66 +2,143 @@
 # Usage: 
 # The image names will be the same as its directory name
 # The version specified below is the same throughout the Dockerfiles
-
-
+#
+# Example:
+# ./Build-DockerImageTree.sh parent_image child_image grandchild_image ..etc
+# ./Build-DockerImageTree.sh python36-ai jlab-eda jlab-dl jlab-cv
 # The image/directory names in the images array below are in parent-child order
+
+clear
+
+# Terminal Colors
+red=`tput setaf 1`
+green=`tput setaf 2`
+yellow=`tput setaf 3`
+reset=`tput sgr0`
+
+function helpmenu {
+    echo -e "\n${red}Usage: ${reset}$0 parent_image child_image grandchild_image ..etc"
+    echo -e "       -h   --help       Shows help"
+    echo -e "       -v   --verbose    Verbose mode"
+    echo ''
+    exit 0
+}
+# Simple Help switches/arguments
+if [ -z "$*" ]; then
+    helpmenu
+fi
+for arg in $@; do
+    if [[ ($arg == "-h") || ($arg == "--help") ]]; then
+       helpmenu
+fi
+done
+
+
+# Set the images in parent-child order
 #images=( python36-ai jlab-eda jlab-dl jlab-cv )
-images=$@
+
+# Converts command line arguments (the images) into a list/array
+images=( "$@" )
+
 version='latest'
 
 
 # Creates directory if it does not exist
 ReportDir='docker_build_errors'
 if [ ! -d "$ReportDir" ]; then
-    echo "[!] Creating Directory... $ReportDir"
+    echo -e "${red}[!]${green} Creating Directory...  $ReportDir${reset}"
     mkdir ./$ReportDir
 fi
 
+echo -e "\n${yellow}================================================================================${reset}"
 
 # iterates through list and builds images
 # reports are saved to the above directory 
 for image in "${images[@]}"; do
 
     # Parses hardening_manifest.yaml and download packages to the image's docker directory
-    echo "[!] Checking hardening_manifest for packages"
+    echo -e "\n${red}[!]${green} Checking hardening_manifest for packages${reset}"
     hardening_manifest=$(cat ./$image/hardening_manifest.yaml | grep 'url:' | cut -f 4 -d ' ')
     while IFS= read -r PackageURL; do 
         PackageName=$(echo "$PackageURL" | rev | cut -f -1 -d '/' | rev)
         if [[ $(ls ./$image/$PackageName) ]]; then 
-            echo "    - Package already exists... $PackageName"
-            continue
+            for arg in $@; do
+                if [[ ($arg == "-v") || ($arg == "--verbose") ]]; then
+                    echo "    - Package already exists...  $PackageName${reset}"                    
+                fi
+            done
         else
-            echo "    - Downloading package... $PackageURL"; 
-            curl --url $PackageURL --output ./$image/$PackageName
-            continue
+            echo "    - Downloading package...  ${yellow}$PackageURL${reset}"
+            curl --location --url $PackageURL --output ./$image/$PackageName
         fi 2> /dev/null
     done <<< ./$image/$hardening_manifest
 
 
     # Removes any existing test builds; helps keep docker image listing clean
-    echo "[!] Checking for any removing previous test builds"
+    echo -e "\n${red}[!]${green} Checking for any removing previous test builds${reset}"
     if docker images | grep "^$image\b" | grep "$version"; then
-        echo "    - Removing previous test build... $image:$version"
-        docker images | grep "^$image\b" | grep "$version" && docker rmi "$image:$version"
+        echo "    - Removing previous test build...${yellow}  $image:$version${reset}"
+        docker images | grep "^$image\b" | grep "$version" && docker rmi "$image:$version" -f
     fi
 
 
     # Builds the image(s)
-    echo "[!] Attempting to build image... $image:$version"
+    echo -e "\n${red}[!]${green} Attempting to build image...${yellow}  $image:$version${reset}"
     docker build -t "$image:$version" ./"$image" #2>&1 ./$ReportDir/errors_$image.txt
 
 
     # Checkes if image is built or not and provides message
     if [[ $(docker images | grep "^$image\b" | grep "$version") ]]; then 
-        echo "[!] Image was successfully built!"
+        echo -e "\n${red}[!]${green} Image was successfully built!${reset}"
     else 
-        echo "[!] Image failed to build - view error report in: $ReportDir"
+        echo -e "\n${red}[!]${green} Image failed to build - view error report in:${yellow} $ReportDir${reset}"
     fi
+
+    echo -e "\n${yellow}================================================================================${reset}"
+
 done
+
+echo ' '
+echo "${red}[!]${green} Images successfully created:${reset}"
 
 # Lists the docker images created
 for image in "${images[@]}"; do
     docker images | grep "^$image\b" | grep "$version"
 done
+
+echo -e "\n${yellow}================================================================================${reset}\n"
+
+
+# Test commands against image
+
+
+for image in "${images[@]}"; do
+    # Removes existing error file
+    rm -f ./$ReportDir/errors_$image.txt 2> /dev/null
+
+    test_cmd_file="./$image/test_cmds.txt"
+    if test -f "$test_cmd_file"; then    
+        image_id=$(docker images | grep "^$image\b" | grep "$version" | tr -s ' ' | cut -d ' ' -f 3)
+
+        echo "${red}[!]${reset} Testing commands aginst image:${yellow}  $image${reset}"
+        test_commands=$(cat $test_cmd_file)
+        while IFS= read -r cmd; do
+
+            # runs each command against the docker image
+            test_cmd="docker run $image_id $cmd"
+            eval "$test_cmd" 1> /dev/null 2>> ./$ReportDir/errors_$image.txt
+            
+            # Set text color if eval code is successful or not (exit code 0)
+            if [ "$?" == "0" ]; then
+                echo -e "\e[0;32m    - $cmd${reset}"
+            else
+                echo -e "\e[0;31m    - $cmd  ${yellow}[View Error Log:  ./$ReportDir/errors_$image.txt]${reset}"
+            fi
+        done <<< $test_commands
+    fi
+done
+
+echo -e "\n${yellow}================================================================================${reset}\n"
+
 
 
