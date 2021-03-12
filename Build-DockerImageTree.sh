@@ -42,9 +42,8 @@ images=( "$@" )
 
 version='latest'
 
-
 # Creates directory if it does not exist
-ReportDir='docker_build_errors'
+ReportDir='docker_build_reports'
 if [ ! -d "$ReportDir" ]; then
     echo -e "${red}[!]${green} Creating Directory...  $ReportDir${reset}"
     mkdir ./$ReportDir
@@ -55,7 +54,6 @@ echo -e "\n${yellow}============================================================
 # iterates through list and builds images
 # reports are saved to the above directory 
 for image in "${images[@]}"; do
-
     # Parses hardening_manifest.yaml and download packages to the image's docker directory
     echo -e "\n${red}[!]${green} Checking hardening_manifest for packages${reset}"
     hardening_manifest=$(cat ./$image/hardening_manifest.yaml | grep 'url:' | cut -f 4 -d ' ')
@@ -82,9 +80,9 @@ for image in "${images[@]}"; do
     fi
 
 
-    # Builds the image(s)
+    # Builds the image(s) 
     echo -e "\n${red}[!]${green} Attempting to build image...${yellow}  $image:$version${reset}"
-    docker build -t "$image:$version" ./"$image" #2>&1 ./$ReportDir/errors_$image.txt
+    docker build -t "$image:$version" ./"$image"
 
 
     # Checkes if image is built or not and provides message
@@ -110,11 +108,10 @@ echo -e "\n${yellow}============================================================
 
 
 # Test commands against image
-
-
 for image in "${images[@]}"; do
     # Removes existing error file
-    rm -f ./$ReportDir/errors_$image.txt 2> /dev/null
+    rm -f ./$ReportDir/stderr_$image.txt
+    rm -f ./$ReportDir/stderr_$image.txt
 
     test_cmd_file="./$image/test_cmds.txt"
     if test -f "$test_cmd_file"; then    
@@ -124,15 +121,15 @@ for image in "${images[@]}"; do
         test_commands=$(cat $test_cmd_file)
         while IFS= read -r cmd; do
 
-            # runs each command against the docker image
+            # runs each command against the docker image and creates logs 
             test_cmd="docker run $image_id $cmd"
-            eval "$test_cmd" 1> /dev/null 2>> ./$ReportDir/errors_$image.txt
+            eval "$test_cmd" 2>> ./$ReportDir/stderr_$image.txt 1>> ./$ReportDir/stdout_$image.txt
             
             # Set text color if eval code is successful or not (exit code 0)
             if [ "$?" == "0" ]; then
-                echo -e "\e[0;32m    - $cmd${reset}"
+                echo -e "    - ${green}$cmd${reset}"
             else
-                echo -e "\e[0;31m    - $cmd  ${yellow}[View Error Log:  ./$ReportDir/errors_$image.txt]${reset}"
+                echo -e "    - ${red}$cmd  ${yellow}[View Error Log:  ./$ReportDir/stderr_$image.txt]${reset}"
             fi
         done <<< $test_commands
     fi
