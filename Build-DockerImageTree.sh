@@ -1,13 +1,3 @@
-
-# Usage: 
-# The image names will be the same as its directory name
-# The version specified below is the same throughout the Dockerfiles
-#
-# Example:
-# ./Build-DockerImageTree.sh parent_image child_image grandchild_image ..etc
-# ./Build-DockerImageTree.sh python36-ai jlab-eda jlab-dl jlab-cv
-# The image/directory names in the images array below are in parent-child order
-
 clear
 
 # Terminal Colors
@@ -17,10 +7,24 @@ yellow=`tput setaf 3`
 reset=`tput sgr0`
 
 function helpmenu {
-    echo -e "\n${red}Usage: ${reset}$0 parent_image child_image grandchild_image ..etc"
+    echo -e "\n${red}Usage:\n${reset}$0 parent_image child_image grandchild_image ..etc"
     echo -e "       -h   --help       Shows help"
     echo -e "       -v   --verbose    Verbose mode"
-    echo ''
+    echo -e "\n${red}Notes:${reset}"
+    echo -e "The image names should be the same as its directory name"
+    echo -e "The version specified below is the same throughout the Dockerfiles"
+    echo -e "This script should be ran from the partent dir common to the those that have Dockerfiles"
+    echo -e "\n${red}hardening_manifest.yaml${reset} needs to be in the same dir at the Dockerfile"
+    echo -e "- this file is parsed to download any dependencies"
+    echo -e "\n${red}test_commands.txt${reset} needs to be in the same dir as the Dockerfile"
+    echo -e "- this file contains one command per line to run against an image"
+    echo -e "- sample test commands:"
+    echo -e "    wget www.google.com"
+    echo -e "    netstat"
+    echo -e "    python3.6 -c 'import plotly'"
+    echo -e "\n${red}Examples:${reset}"
+    echo -e "./Build-DockerImageTree.sh parent_image child_image grandchild_image ..etc"
+    echo -e "./Build-DockerImageTree.sh python36-ai jlab-eda jlab-dl jlab-cv\n"
     exit 0
 }
 # Simple Help switches/arguments
@@ -33,9 +37,6 @@ for arg in $@; do
 fi
 done
 
-
-# Set the images in parent-child order
-#images=( python36-ai jlab-eda jlab-dl jlab-cv )
 
 # Converts command line arguments (the images) into a list/array
 images=( "$@" )
@@ -106,14 +107,13 @@ done
 
 echo -e "\n${yellow}================================================================================${reset}\n"
 
-
 # Test commands against image
 for image in "${images[@]}"; do
     # Removes existing error file
     rm -f ./$ReportDir/stderr_$image.txt
     rm -f ./$ReportDir/stderr_$image.txt
 
-    test_cmd_file="./$image/test_cmds.txt"
+    test_cmd_file="./$image/test_commands.txt"
     if test -f "$test_cmd_file"; then    
         image_id=$(docker images | grep "^$image\b" | grep "$version" | tr -s ' ' | cut -d ' ' -f 3)
 
