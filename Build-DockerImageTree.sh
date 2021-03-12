@@ -46,7 +46,7 @@ version='latest'
 # Creates directory if it does not exist
 ReportDir='docker_build_reports'
 if [ ! -d "$ReportDir" ]; then
-    echo -e "${red}[!]${green} Creating Directory...  $ReportDir${reset}"
+    echo -e "\n${red}[!]${green} Creating Directory...  $ReportDir${reset}"
     mkdir ./$ReportDir
 fi
 
@@ -63,11 +63,11 @@ for image in "${images[@]}"; do
         if [[ $(ls ./$image/$PackageName) ]]; then 
             for arg in $@; do
                 if [[ ($arg == "-v") || ($arg == "--verbose") ]]; then
-                    echo "    - Package already exists...  $PackageName${reset}"                    
+                    echo -e "    - Package already exists...  $PackageName${reset}"                    
                 fi
             done
         else
-            echo "    - Downloading package...  ${yellow}$PackageURL${reset}"
+            echo -e "    - Downloading package...  ${yellow}$PackageURL${reset}"
             curl --location --url $PackageURL --output ./$image/$PackageName
         fi 2> /dev/null
     done <<< ./$image/$hardening_manifest
@@ -76,7 +76,7 @@ for image in "${images[@]}"; do
     # Removes any existing test builds; helps keep docker image listing clean
     echo -e "\n${red}[!]${green} Checking for any removing previous test builds${reset}"
     if docker images | grep "^$image\b" | grep "$version"; then
-        echo "    - Removing previous test build...${yellow}  $image:$version${reset}"
+        echo -e "    - Removing previous test build...${yellow}  $image:$version${reset}"
         docker images | grep "^$image\b" | grep "$version" && docker rmi "$image:$version" -f
     fi
 
@@ -97,8 +97,8 @@ for image in "${images[@]}"; do
 
 done
 
-echo ' '
-echo "${red}[!]${green} Images successfully created:${reset}"
+echo -e ' '
+echo -e "${red}[!]${green} Images successfully created:${reset}"
 
 # Lists the docker images created
 for image in "${images[@]}"; do
@@ -117,12 +117,12 @@ for image in "${images[@]}"; do
     if test -f "$test_cmd_file"; then    
         image_id=$(docker images | grep "^$image\b" | grep "$version" | tr -s ' ' | cut -d ' ' -f 3)
 
-        echo "${red}[!]${reset} Testing commands aginst image:${yellow}  $image${reset}"
+        echo -e "${red}[!]${reset} Testing commands aginst image:${yellow}  $image${reset}"
         test_commands=$(cat $test_cmd_file)
         while IFS= read -r cmd; do
 
             # runs each command against the docker image and creates logs 
-            test_cmd="docker run $image_id $cmd"
+            test_cmd="docker run --rm $image_id $cmd"
             eval "$test_cmd" 2>> ./$ReportDir/stderr_$image.txt 1>> ./$ReportDir/stdout_$image.txt
             
             # Set text color if eval code is successful or not (exit code 0)
