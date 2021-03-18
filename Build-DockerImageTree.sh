@@ -57,7 +57,7 @@ echo -e "\n${yellow}============================================================
 for image in "${images[@]}"; do
     # Parses hardening_manifest.yaml and download packages to the image's docker directory
     echo -e "\n${red}[!]${green} Checking hardening_manifest for packages${reset}"
-    hardening_manifest=$(cat ./$image/hardening_manifest.yaml | grep ' url:' | cut -f 4 -d ' ')
+    hardening_manifest=$(cat ./$image/hardening_manifest.yaml | tr -s ' ' | grep ' url:' | cut -f 1 -d ' ')
     IFS=; while read -r PackageURL; do 
         PackageName=$(echo "$PackageURL" | rev | cut -f -1 -d '/' | rev)
         if [[ $(ls ./$image/$PackageName) ]]; then 
