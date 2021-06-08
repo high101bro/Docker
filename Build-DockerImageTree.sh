@@ -43,12 +43,12 @@ images=( "$@" )
 
 version='latest'
 
-# Creates directory if it does not exist
-ReportDir='docker_build_reports'
-if [ ! -d "$ReportDir" ]; then
-    echo -e "\n${red}[!]${green} Creating Directory...  $ReportDir${reset}"
-    mkdir ./$ReportDir
-fi
+# # Creates directory if it does not exist
+# ReportDir='docker_build_reports'
+# if [ ! -d "$ReportDir" ]; then
+#     echo -e "\n${red}[!]${green} Creating Directory...  $ReportDir${reset}"
+#     mkdir ./$ReportDir
+# fi
 
 echo -e "\n${yellow}================================================================================${reset}"
 
@@ -57,15 +57,31 @@ echo -e "\n${yellow}============================================================
 for image in "${images[@]}"; do
     # Parses hardening_manifest.yaml and download packages to the image's docker directory
     echo -e "\n${red}[!]${green} Checking hardening_manifest for packages${reset}"
-    hardening_manifest=$(cat ./$image/hardening_manifest.yaml | grep ' url:' | tr -s ' ' | cut -d ' ' -f 3)
-    IFS=; while read -r PackageURL; do 
+    hardening_manifest=$(cat ./$image/hardening_manifest.yaml | grep ' filename:' -A 4)
+    IFS=; while read -r FileName; do 
+        #echo "$FileName"
+        PackageURL=$(echo "$FileName" | grep ' url:' | tr -s ' ' | cut -d ' ' -f 3)
+        #echo "$PackageURL"
         PackageName=$(echo "$PackageURL" | rev | cut -f -1 -d '/' | rev)
+        #echo "$PackageName"
         if [[ $(ls ./$image/$PackageName) ]]; then 
+            #echo "./$image/$PackageName"
             for arg in $@; do
                 if [[ ($arg == "-v") || ($arg == "--verbose") ]]; then
                     echo -e "    - Package already exists...  $PackageName${reset}"                    
                 fi
             done
+            #echo '----------------------------------'
+            ManifestHash=$(echo "$FileName" | grep ' value:' | tr -s ' ' | cut -d ' ' -f 3)
+            #echo "$ManifestHash"
+            PackageHash="$(sha256sum ./$image/$PackageName | cut -d ' ' -f 1)"
+            #echo "$PackageHash"
+            #echo -e "$ManifestHash=====$PackageHash"
+            #if ( $ManifestHash == $PackageHash ); then
+            #    echo 'Yes--------'
+            #else
+            #    echo 'no'
+            #fi
         else
             echo -e "    - Downloading package...  ${yellow}$PackageURL${reset}"
             curl --location --url $PackageURL --output ./$image/$PackageName
@@ -73,12 +89,12 @@ for image in "${images[@]}"; do
     done <<< $hardening_manifest
 
 
-    # Removes any existing test builds; helps keep docker image listing clean
-    echo -e "\n${red}[!]${green} Checking for any removing previous test builds${reset}"
-    if docker images | grep "^$image\b" | grep "$version"; then
-        echo -e "    - Removing previous test build...${yellow}  $image:$version${reset}"
-        docker images | grep "^$image\b" | grep "$version" && docker rmi "$image:$version" -f
-    fi
+#    # Removes any existing test builds; helps keep docker image listing clean
+#    echo -e "\n${red}[!]${green} Checking for any removing previous test builds${reset}"
+#    if docker images | grep "^$image\b" | grep "$version"; then
+#        echo -e "    - Removing previous test build...${yellow}  $image:$version${reset}"
+#        docker images | grep "^$image\b" | grep "$version" && docker rmi "$image:$version" -f
+#    fi
 
 
     # Builds the image(s) 
@@ -109,9 +125,9 @@ echo -e "\n${yellow}============================================================
 
 # Test commands against image
 for image in "${images[@]}"; do
-    # Removes existing report files
-    rm -f ./$ReportDir/stderr_$image.txt
-    rm -f ./$ReportDir/stderr_$image.txt
+    # # Removes existing report files
+    # rm -f ./$ReportDir/stderr_$image.txt
+    # rm -f ./$ReportDir/stderr_$image.txt
 
     test_cmd_file="./$image/test_commands.txt"
     if test -f "$test_cmd_file"; then    
@@ -123,7 +139,7 @@ for image in "${images[@]}"; do
 
             # runs each command against the docker image and creates logs 
             test_cmd="docker run --rm $image_id $cmd"
-            eval "$test_cmd" 2>> ./$ReportDir/stderr_$image.txt 1>> ./$ReportDir/stdout_$image.txt
+            eval "$test_cmd" 2&>1 /dev/null #2>> ./$ReportDir/stderr_$image.txt 1>> ./$ReportDir/stdout_$image.txt
             
             # Set text color if eval code is successful or not (exit code 0)
             if [ "$?" == "0" ]; then
